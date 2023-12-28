@@ -6,4 +6,4 @@
 
 ## Download Caprover Backup
 
-`curl -fsSL https://raw.githubusercontent.com/fadlee/bash-scripts/main/caprover-backup.sh | sh`
+`bash <(curl -fsSL https://raw.githubusercontent.com/fadlee/bash-scripts/main/caprover-backup.sh)`

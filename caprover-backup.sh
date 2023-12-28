@@ -26,6 +26,8 @@ if [ ${#DOWNLOAD_TOKEN} -le 10 ]; then
     exit 1
 fi
 
-wget -q "$CAPROVER_URL/api/v2/downloads/?namespace=captain&downloadToken=$DOWNLOAD_TOKEN" -O backup.tar
+mkdir -p /captain
 
-echo "Caprover backup downloaded as backup.tar"
+wget -q "$CAPROVER_URL/api/v2/downloads/?namespace=captain&downloadToken=$DOWNLOAD_TOKEN" -O /captain/backup.tar
+
+echo "Caprover backup downloaded to /captain/backup.tar"

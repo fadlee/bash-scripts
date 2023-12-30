@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set up a cron job to run it hourly:
-# 0 * * * * /path/to/mysql-backup-hourly.sh
+# 0 * * * * /backups/mysql-backup-hourly.sh
 
 # MySQL connection details
 DB_HOST="localhost"
@@ -11,62 +11,52 @@ DB_PASSWORD="your_mysql_password"
 # List of databases to backup (space-separated)
 DATABASES="db1 db2 db3"
 
-# Backup directory
-BACKUP_DIR="/path/to/backup/directory"
-
-# Current date and time for backup filenames
-DATE=$(date +"%Y%m%d%H%M%S")
-DAY=$(date +"%d")
-WEEK=$(date +"%U")
-MONTH=$(date +"%m")
+# Backup root directory
+BACKUP_ROOT_DIR="/path/to/backup/directory"
 
 # Function to perform MySQL backup
 perform_backup() {
   local DB_NAME=$1
-  local BACKUP_FILE="$BACKUP_DIR/${DB_NAME}_${DATE}.sql"
+  local FREQUENCY=$2
+  local APPEND_NAME=$3
+  local BACKUP_DIR="$BACKUP_ROOT_DIR/$FREQUENCY"
+  local BACKUP_FILE="$BACKUP_DIR/${DB_NAME}_${APPEND_NAME}.sql"
+
+  # Skip backup if file already exists
+  if [ -f "$BACKUP_FILE.gz" ]; then
+    echo "Skipping backup of $DB_NAME for $FREQUENCY. File already exists: $BACKUP_FILE.gz"
+    return
+  fi
+
+  # Ensure the backup directory exists
+  mkdir -p "$BACKUP_DIR"
 
   # Perform mysqldump
   mysqldump -h$DB_HOST -u$DB_USER -p$DB_PASSWORD --databases $DB_NAME > $BACKUP_FILE
 
+  gzip $BACKUP_FILE
+
   # Check if mysqldump was successful
   if [ $? -eq 0 ]; then
-    echo "Backup of $DB_NAME completed successfully. File: $BACKUP_FILE"
+    echo "Backup of $DB_NAME for $FREQUENCY completed successfully. File: $BACKUP_FILE.gz"
   else
-    echo "Error: Backup of $DB_NAME failed."
+    echo "Error: Backup of $DB_NAME for $FREQUENCY failed."
   fi
 }
 
-# Create hourly backup
+# Create backups
 for DB_NAME in $DATABASES
 do
-  perform_backup $DB_NAME
+  perform_backup $DB_NAME "hourly" $(date +"%Y-%m-%d-%H") # 2023-12-30-16
+  perform_backup $DB_NAME "daily" $(date +"%Y-%m-%d") # 2023-12-30
+  perform_backup $DB_NAME "weekly" $(date +"%Y-w%U") # 2023-w52
+  perform_backup $DB_NAME "monthly" $(date +"%Y-%m") # 2023-12
 done
 
-# Remove hourly backups older than 1 day
-find $BACKUP_DIR -type f -name "${DATABASES// /_}_${DATE}.sql" -mtime +1 -exec rm {} \;
-
-# Create weekly backup (only for the first day of the week)
-if [ "$DAY" -eq 01 ]; then
-  for DB_NAME in $DATABASES
-  do
-    perform_backup $DB_NAME
-    mv "$BACKUP_DIR/${DB_NAME}_${DATE}.sql" "$BACKUP_DIR/weekly_${DB_NAME}_${WEEK}.sql"
-  done
-fi
-
-# Remove weekly backups older than 30 days
-find $BACKUP_DIR -type f -name "weekly_*_[0-9][0-9].sql" -mtime +30 -exec rm {} \;
-
-# Create monthly backup (only for the first day of the month)
-if [ "$DAY" -eq 01 ]; then
-  for DB_NAME in $DATABASES
-  do
-    perform_backup $DB_NAME
-    mv "$BACKUP_DIR/${DB_NAME}_${DATE}.sql" "$BACKUP_DIR/monthly_${DB_NAME}_${MONTH}.sql"
-  done
-fi
-
-# Remove monthly backups older than 365 days
-find $BACKUP_DIR -type f -name "monthly_*_[0-9][0-9].sql" -mtime +365 -exec rm {} \;
+# Remove backups older than specified days
+find "$BACKUP_ROOT_DIR/hourly" -type f -name "${DATABASES// /_}_*" -mtime +1 -exec rm {} \;
+find "$BACKUP_ROOT_DIR/daily" -type f -name "${DATABASES// /_}_*" -mtime +7 -exec rm {} \;
+find "$BACKUP_ROOT_DIR/weekly" -type f -name "${DATABASES// /_}_*" -mtime +30 -exec rm {} \;
+find "$BACKUP_ROOT_DIR/monthly" -type f -name "${DATABASES// /_}_*" -mtime +365 -exec rm {} \;
 
 echo "Backup process completed."

@@ -1,28 +1,20 @@
 #!/bin/bash
 
-# MySQL connection parameters for target database
-DEFAULT_TARGET_DB_USER=""
-DEFAULT_TARGET_DB_PASSWORD=""
-DEFAULT_TARGET_DB_HOST=""
-TARGET_DB_NAME="target_database"
+# Prompt for MySQL connection details
+read -p "Enter MySQL host (press Enter for default): " DB_HOST
+read -p "Enter MySQL username (press Enter for default): " DB_USER
 
-# Prompt the user for the MySQL database host
-read -p "Enter MySQL host (press Enter for default): " TARGET_DB_HOST
-TARGET_DB_HOST=${TARGET_DB_HOST:-$DEFAULT_TARGET_DB_HOST}
-HOST_PARAM=""
-[ -n "$TARGET_DB_HOST" ] && HOST_PARAM="-h $TARGET_DB_HOST"
-
-# Prompt the user for the MySQL username
-read -p "Enter MySQL username (press Enter for default): " TARGET_DB_USER
-TARGET_DB_USER=${TARGET_DB_USER:-$DEFAULT_TARGET_DB_USER}
-USER_PARAM=""
-[ -n "$TARGET_DB_USER" ] && USER_PARAM="-u $TARGET_DB_USER"
-
-# Prompt the user for the MySQL password
-read -s -p "Enter MySQL password (press Enter for empty password): " TARGET_DB_PASSWORD
+# Prompt for MySQL password without echoing
+echo -n "Enter MySQL password (press Enter for default): "
+stty -echo
+read DB_PASSWORD
+stty echo
 echo
-PASSWORD_PARAM=""
-[ -n "$TARGET_DB_PASSWORD" ] && PASSWORD_PARAM="-p$TARGET_DB_PASSWORD"
+
+mysql_param=""
+[ -n "$DB_HOST" ] && mysql_param+=" -h$DB_HOST"
+[ -n "$DB_USER" ] && mysql_param+=" -u$DB_USER"
+[ -n "$DB_PASSWORD" ] && mysql_param+=" -p$DB_PASSWORD"
 
 # Prompt the user for the SQL file containing the source database dump
 read -p "Enter the SQL file name (e.g., source_database_dump.sql): " SQL_FILE
@@ -34,14 +26,14 @@ if [ ! -f "$SQL_FILE" ]; then
 fi
 
 # Check if the target database exists
-if mysql $USER_PARAM $PASSWORD_PARAM $HOST_PARAM -e "USE $TARGET_DB_NAME;" 2>/dev/null; then
+if mysql $mysql_param -e "USE $TARGET_DB_NAME;" 2>/dev/null; then
   # Target database exists, drop it
-  mysql $USER_PARAM $PASSWORD_PARAM $HOST_PARAM -e "DROP DATABASE $TARGET_DB_NAME;"
+  mysql $mysql_param -e "DROP DATABASE $TARGET_DB_NAME;"
 fi
 
-mysql $USER_PARAM $PASSWORD_PARAM $HOST_PARAM -e "CREATE DATABASE $TARGET_DB_NAME;"
+mysql $mysql_param -e "CREATE DATABASE $TARGET_DB_NAME;"
 
 # Import the source dump into the target database
-mysql $USER_PARAM $PASSWORD_PARAM $HOST_PARAM $TARGET_DB_NAME < $SQL_FILE
+mysql $mysql_param $TARGET_DB_NAME < $SQL_FILE
 
 echo "Database import completed."
